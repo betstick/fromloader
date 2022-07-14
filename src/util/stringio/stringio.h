@@ -1,11 +1,10 @@
 #pragma once
-#include <stdio.h>
-#include <string>
-#include <stdexcept>
-#include <stdbool.h>
+#include "../../common/common.h"
 
 #include "../endian/endian.h"
 #include "umem.h"
+
+#include <map>
 
 #ifndef CFR_STRINGS
 #define CFR_STRINGS
@@ -31,6 +30,8 @@ namespace cfr
 
 	//seeks to string, reads till null, returns wchar array, sets len, returns to start
 	wchar_t* getUniversalString(long offset, bool unicode, UMEM* src, int* len);
+
+	char* jisToUtf8(char* str, int lengthIn, std::map<int,int>* charMap, int* lengthOut);
 };
 
 #endif

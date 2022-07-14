@@ -53,6 +53,7 @@ namespace cfr
 			MarkedString();
 
 			void print();
+			char* toUtf8(std::map<int,int>* charMap, int* length);
 		};
 
 		class Texture

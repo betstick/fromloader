@@ -1,4 +1,5 @@
 #include "mtd.h"
+#include <locale.h>
 
 namespace cfr
 {
@@ -43,7 +44,7 @@ namespace cfr
 		if(this->length > 0)
 		{
 			this->str = (char*)malloc(this->length*sizeof(char));
-			uread(&this->str,this->length,1,src);
+			uread(&this->str[0],this->length,1,src);
 		}
 
 		this->marker = Marker(src);
@@ -188,7 +189,12 @@ namespace cfr
 
 	void MTD::MarkedString::print()
 	{
-		printf("%s",this->str);
+		printf("%s",&this->str);
+	};
+
+	char* MTD::MarkedString::toUtf8(std::map<int,int>* charMap, int* length)
+	{
+		return jisToUtf8(this->str,this->length,charMap,length);
 	};
 
 	void MTD::Param::print()
@@ -208,7 +214,7 @@ namespace cfr
 	{
 		int i = 0;
 		printf("params:\n");
-		printf("\tname: %s\n",this->mtdData.lists.params[i].name.str);
-		printf("\value:",this->mtdData.lists.params[i].value.floatValues);
+		printf("\tname: %s\n",&this->mtdData.lists.params[i].name.str);
+		//printf("\tvalue: %0",this->mtdData.lists.params[i].value.floatValues);
 	};
 };

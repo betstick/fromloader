@@ -1,4 +1,5 @@
 #include "stringio.h"
+#include <uniconv.h>
 
 namespace cfr
 {
@@ -136,9 +137,14 @@ namespace cfr
 		}
 		else
 		{			
-			while(ugetc(src) != '\0')
+			char c;
+			
+			while(true)
 			{
+				uread(&c,sizeof(char),1,src);
 				length++;
+				if(c == '\0')
+					break;
 			}
 
 			useek(src,-length,SEEK_CUR);
@@ -171,4 +177,57 @@ namespace cfr
 
 		return offset;
 	};
+
+	char* jisToUtf8(char* str, int lengthIn, std::map<int,int>* charMap, int* lengthOut)
+	{
+		int newLength = 0;
+		int ci = 0;
+		while(ci < lengthIn)
+		{
+			char section = (uint8_t)str[ci] >> 4;
+			if(section == 0x8 || section == 0x9 || section == 0xE)
+			{
+				newLength++;
+				ci+=2;
+			}
+			else
+			{
+				newLength++;
+				ci+=1;
+			}
+			
+		}
+
+		char* output = (char*)malloc(newLength);
+		for(int i = 0; i < newLength; i++)
+		{
+			output[i] = '\0';
+		}
+		ci = 0;
+		int newIndex = 0;
+		while(ci < lengthIn)
+		{
+			char section = (uint8_t)str[ci] >> 4;
+			if(section == 0x8 || section == 0x9 || section == 0xE)
+			{
+				wchar_t w = L'\0';
+				memcpy(&w,&str[ci],2);
+				char utf = (*charMap)[(int)w];
+				memcpy(&output[newIndex],&utf,1);
+				ci+=2;
+			}
+			else
+			{
+				char c = '\0';
+				memcpy(&c,&str[ci],1);
+				char utf = (*charMap)[(int)c];
+				memcpy(&output[newIndex],&utf,1);
+				ci+=1;
+			}
+			newIndex++;
+		}
+
+		//memcpy(&newLength,lengthOut,sizeof(int));
+		return output;
+	};	
 };

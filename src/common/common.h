@@ -11,10 +11,13 @@
 #include <cstdlib>
 #include <unordered_map>
 #include <wchar.h>
+#include <stdbool.h>
 
 //string conversions
 #include <locale>
 #include <codecvt>
+#include <unicode/unistr.h>
+#include <unicode/icuplug.h>
 
 //memory manipulation
 #include <memory>
