@@ -24,7 +24,7 @@ namespace cfr
 
 		useek(src,0,SEEK_SET);
 
-		switch(format)
+		/*switch(format)
 		{
 			case FROM_DCX:
 				throw std::runtime_error("Found double compression?\n");
@@ -44,7 +44,7 @@ namespace cfr
 			//	return new BND4(tmp);
 			case UNKOWN_FORMAT:
 				throw std::runtime_error("Unkown format!\n");
-		}
+		}*/
 
 		return nullptr;
 	};

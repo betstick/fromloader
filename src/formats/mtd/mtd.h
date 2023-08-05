@@ -2,12 +2,12 @@
 
 #include <stdexcept>
 #include <map>
-
+#include <memory>
 #include "../stdafx.h"
 
 namespace cfr
 {
-	class MTD : public File
+	class MTD
 	{
 		public:
 		class Marker;
@@ -26,7 +26,6 @@ namespace cfr
 			uint8_t value = 0;
 
 			Marker(UMEM* src);
-			Marker();
 		};
 
 		class Block
@@ -36,10 +35,10 @@ namespace cfr
 			int32_t length = 0;
 			int32_t type = 0;
 			int32_t version = 0;
-			Marker marker;
+			Marker* marker;
 
 			Block(UMEM* src);
-			Block();
+			~Block();
 		};
 
 		class MarkedString
@@ -47,58 +46,60 @@ namespace cfr
 			public:
 			int32_t length = 0;
 			char* str = nullptr;
-			Marker marker;
+			Marker* marker;
 
 			MarkedString(UMEM* src);
-			MarkedString();
+			~MarkedString();
 
 			void print();
-			char* toUtf8(std::map<int,int>* charMap, int* length);
+			int toUtf8(char* out);
 		};
 
 		class Texture
 		{
 			public:
-			Block block;
-			MarkedString type;
+			Block* block;
+			MarkedString* type;
 			int32_t uvNumer = 0;
-			Marker marker;
+			Marker* marker;
 			int32_t shaderDataIndex = 0;
 
 			//only if version == 5
 			int32_t unkB0C = 0;
-			MarkedString path;
+			MarkedString* path;
 			int32_t floatCount = 0;
 			float* floats = nullptr;
 
 			Texture(UMEM* src);
+			~Texture();
 		};
 
 		class Value
 		{
 			public:
-			Block block;
+			Block* block;
 			int32_t valueCount = 0;
 			int8_t* byteValues = nullptr;
 			int32_t* intValues = nullptr;
 			float* floatValues = nullptr;
 
 			Value(UMEM* src);
-			Value();
+			~Value();
 		};
 
 		class Param
 		{
 			public:
-			Block block;
-			MarkedString name;
-			MarkedString type;
+			Block* block;
+			MarkedString* name;
+			MarkedString* type;
 			int32_t unkB00 = 0;
-			Value value;
-			Marker end;
+			Value* value;
+			Marker* end;
 			int32_t unkC00 = 0;
 
 			Param(UMEM* src);
+			~Param();
 
 			void print();
 		};
@@ -106,56 +107,57 @@ namespace cfr
 		class Lists
 		{
 			public:
-			Block block;
+			Block* block;
 			int32_t unkA04 = 0;
-			Marker marker;
+			Marker* marker;
 			int32_t paramCount = 0;
-			Param* params = nullptr;
-			Marker paramsEnd;
+			Param** params = nullptr;
+			Marker* paramsEnd;
 			int32_t textureCount = 0;
-			Texture* textures = nullptr;
-			Marker end;
+			Texture** textures = nullptr;
+			Marker* end;
 			int32_t unkC00 = 0;
 
 			Lists(UMEM* src);
-			Lists();
+			~Lists();
 		};
 
 		class Data
 		{
 			public:
-			Block block;
-			MarkedString shader;
-			MarkedString description;
+			Block* block;
+			MarkedString* shader;
+			MarkedString* description;
 			int32_t unkB00 = 0;
-			Lists lists;
-			Marker end;
+			Lists* lists;
+			Marker* end;
 			int32_t unkC00 = 0;
 
 			Data(UMEM* src);
-			Data();
+			~Data();
 		};
 
 		class Header
 		{
 			public:
-			Block block;
-			MarkedString magic;
+			Block* block;
+			MarkedString* magic;
 			int32_t unkB00 = 0;
 
 			Header(UMEM* src);
-			Header();
+			~Header();
 		};
 
-		Block block;
-		Header header;
-		Marker headerEnd;
-		Data mtdData;
-		Marker end;
+		Block* block;
+		Header* header;
+		Marker* headerEnd;
+		Data* mtdData;
+		Marker* end;
 		int32_t unkC00 = 0;
 
 		MTD(const char* path);
 		MTD(UMEM* src);
+		~MTD();
 
 		void print();
 	};

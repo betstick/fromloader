@@ -6,3 +6,4 @@
 #include "file/file.h"
 #include "inflate/inflate.h"
 #include "endian/endian.h"
+#include "validate/validate.h"

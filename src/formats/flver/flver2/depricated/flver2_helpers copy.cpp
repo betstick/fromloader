@@ -3,7 +3,7 @@
 
 namespace cfr
 {
-	std::vector<FLVER2::BufferLayout> FLVER2::getMeshBufferLayouts(int meshIndex)
+	/*std::vector<FLVER2::BufferLayout> FLVER2::getMeshBufferLayouts(int meshIndex)
 	{
 		std::vector<FLVER2::BufferLayout> ret = std::vector<FLVER2::BufferLayout>();
 
@@ -96,7 +96,7 @@ namespace cfr
 	{
 		char* a;
 		return a;
-	};
+	};*/
 
 	//does not include degenerate faces
 	void FLVER2::Faceset::triangulate()
@@ -287,7 +287,7 @@ namespace cfr
 		}
 	};
 
-	void readUByteNorm(UMEM* src, UMEM* dst)
+	void convertUByteNorm(UMEM* src, UMEM* dst)
 	{
 		uint8_t i;
 		uread(&i,1,1,src);
@@ -295,16 +295,15 @@ namespace cfr
 		uwrite((char*)&f,4,1,dst);
 	};
 
-	void readUByteXYZ(UMEM* src, UMEM* dst)
+	void convertUByteXYZ(UMEM* src, UMEM* dst)
 	{
 		for(int i = 0; i < 3; i++)
 		{
-			readUByteNorm(src,dst);
-			//convertUByteNorm(src,dst);
+			convertUByteNorm(src,dst);
 		}
 	};
 
-	void readSByteZYX(UMEM* src, UMEM* dst)
+	void convertSByteZYX(UMEM* src, UMEM* dst)
 	{
 		float fbuffer[3] = {0.0f,0.0f,0.0f};
 		int8_t ibuffer[3] = {0,0,0};
@@ -318,7 +317,7 @@ namespace cfr
 		uwrite((char*)&fbuffer,12,1,dst);
 	};
 
-	void readShortNorm(UMEM* src, UMEM* dst)
+	void convertShortNorm(UMEM* src, UMEM* dst)
 	{
 		int16_t i = 0;
 		uread(&i,2,1,src);
@@ -326,7 +325,7 @@ namespace cfr
 		uwrite((char*)&f,4,1,dst);
 	};
 
-	void readUShortNorm(UMEM* src, UMEM* dst)
+	void convertUShortNorm(UMEM* src, UMEM* dst)
 	{
 		uint16_t i = 0;
 		uread(&i,2,1,src);
@@ -334,24 +333,11 @@ namespace cfr
 		uwrite((char*)&f,4,1,dst);
 	};
 
-	void readFloat3(void* f3, UMEM* src, UMEM* dst, bool seek = false)
-	{
-		uread(&f3,12,1,src);
-		uwrite((char*)&f3,12,1,dst);
-		if(seek)
-			useek(src,4,SEEK_CUR);
-	};
-
-	void readFloat4(void* f4, UMEM* src, UMEM* dst)
-	{
-		uread(&f4,16,1,src);
-		uwrite((char*)&f4,16,1,dst);
-	};
-
 	//reads raw vertex data and writes it out in a sane manner, dst2 is for secondary type outputs
-	void readVertexData(VertexType type, VertexSemantic semantic, UMEM* src, UMEM* dst, UMEM* dst2, int uvFactor)
+	void convertVertexType(VertexType type, VertexSemantic semantic, UMEM* src, UMEM* dst, UMEM* dst2, int uvFactor)
 	{
-		//int inputSize = getVertexTypeSize(type);
+		//SemanticInfo si = getSemanticInfo(semantic);
+		int inputSize = getVertexTypeSize(type);
 
 		uint8_t ui8 = 0;
 		 int8_t si8 = 0;
@@ -374,9 +360,17 @@ namespace cfr
 				switch(type)
 				{
 					case(FVT_FLOAT3):
-						readFloat3(&f3,src,dst); break;
+						//printf("attempt read");
+						uread(&f3,12,1,src);
+						/*if(dst->mem->size == dst->mem->position)
+							printf("END OF DEST\n");*/
+						uwrite((char*)&f3,12,1,dst);
+						break;
 					case(FVT_FLOAT4):
-						readFloat3(&f3,src,dst,true); break;
+						uread(&f3,12,1,src);
+						uwrite((char*)&f3,12,1,dst);
+						useek(src,4,SEEK_CUR);
+						break;
 				}
 				break;
 			case(FVS_BONE_WEIGHTS):
@@ -439,11 +433,13 @@ namespace cfr
 				switch(type)
 				{
 					case(FVT_FLOAT3):
-						readFloat3(&f3,src,dst);
+						uread(&f3,12,1,src);
+						uwrite((char*)&f3,12,1,dst);
 						uwrite((char*)&si32,4,1,dst2);
 						break;
 					case(FVT_FLOAT4):
-						readFloat3(&f3,src,dst);
+						uread(&f3,12,1,src);
+						uwrite((char*)&f3,12,1,dst);
 						uread(&f1,4,1,src);
 						si32 = (int)f1;
 						uwrite((char*)&si32,4,1,dst2);
@@ -452,7 +448,7 @@ namespace cfr
 					case(FVT_BYTE4B):
 					case(FVT_BYTE4C):
 					case(FVT_BYTE4E):
-						readUByteXYZ(src,dst);
+						convertUByteXYZ(src,dst);
 						uread(&ui8,1,1,src);
 						si32 = (int)ui8;
 						uwrite((char*)&si32,4,1,dst2);
@@ -460,19 +456,19 @@ namespace cfr
 					case(FVT_SHORT2_FLOAT2):
 						uread(&ui8,1,1,src);
 						si32 = (int)ui8;
-						readSByteZYX(src,dst);
+						convertSByteZYX(src,dst);
 						uwrite((char*)&si32,4,1,dst2);
 						break;
 					case(FVT_SHORT4_FLOAT4A):
 						for(int i = 0; i < 3; i++)
-							readShortNorm(src,dst);
+							convertShortNorm(src,dst);
 						uread(&si16,2,1,src);
 						si32 = (int)si16;
 						uwrite((char*)&si32,4,1,dst2);
 						break;
 					case(FVT_SHORT4_FLOAT4B):
 						for(int i = 0; i < 3; i++)
-							readUShortNorm(src,dst);
+							convertUShortNorm(src,dst);
 						uread(&si16,2,1,src);
 						si32 = (int)si16;
 						uwrite((char*)&si32,4,1,dst2);
@@ -486,20 +482,16 @@ namespace cfr
 				{
 					case(FVT_FLOAT2):
 						uread(&f3,8,1,src);
-						f3[1] = 0 - f3[1];
 						uwrite((char*)&f3,8,1,dst);
 						break;
 					case(FVT_FLOAT3):
 						uread(&f3,12,1,src);
-						f3[1] = 0 - f3[1];
 						uwrite((char*)&f3,8,1,dst);
 						break;
 					case(FVT_FLOAT4):
 						uread(&f3,8,1,src);
-						f3[1] = 0 - f3[1];
 						uwrite((char*)&f3,8,1,dst);
 						uread(&f3,8,1,src);
-						f3[1] = 0 - f3[1];
 						uwrite((char*)&f3,8,1,dst);
 						break;
 					case(FVT_BYTE4A):
@@ -512,10 +504,11 @@ namespace cfr
 						uwrite((char*)&f1,4,1,dst);
 
 						uread(&si16,2,1,src);
-						f1 = 0 - ((float)si16 / uvFactor);
+						f1 = (float)si16 / uvFactor;
 						uwrite((char*)&f1,4,1,dst);
 
 						f1 = 0;
+						//uwrite((char*)&f1,4,1,dst);
 						break;
 					case(FVT_UV_PAIR):
 						uread(&si16,2,1,src);
@@ -523,20 +516,22 @@ namespace cfr
 						uwrite((char*)&f1,4,1,dst);
 
 						uread(&si16,2,1,src);
-						f1 = -(float)si16 / uvFactor;
+						f1 = (float)si16 / uvFactor;
 						uwrite((char*)&f1,4,1,dst);
 
 						f1 = 0;
+						//uwrite((char*)&f1,4,1,dst);
 
 						uread(&si16,2,1,src);
 						f1 = (float)si16 / uvFactor;
 						uwrite((char*)&f1,4,1,dst);
 
 						uread(&si16,2,1,src);
-						f1 = -(float)si16 / uvFactor;
+						f1 = (float)si16 / uvFactor;
 						uwrite((char*)&f1,4,1,dst);
 
 						f1 = 0;
+						//uwrite((char*)&f1,4,1,dst);
 						break;
 					case(FVT_SHORT4_FLOAT4B):						
 						uread(&si16,2,1,src);
@@ -544,11 +539,12 @@ namespace cfr
 						uwrite((char*)&f1,4,1,dst);
 
 						uread(&si16,2,1,src);
-						f1 = -(float)si16 / uvFactor;
+						f1 = (float)si16 / uvFactor;
 						uwrite((char*)&f1,4,1,dst);
 
 						uread(&si16,2,1,src);
 						f1 = (float)si16 / uvFactor;
+						///uwrite((char*)&f1,4,1,dst);
 
 						useek(src,2,SEEK_CUR);
 						break;
@@ -561,19 +557,21 @@ namespace cfr
 				switch(type)
 				{
 					case(FVT_FLOAT4):
-						readFloat4(&f4,src,dst); break;
+						uread(&f4,16,1,src);
+						uwrite((char*)&f4,16,1,dst);
+						break;
 					case(FVT_BYTE4A):
 					case(FVT_BYTE4B):
 					case(FVT_BYTE4C):
 					case(FVT_BYTE4E):
-						readUByteXYZ(src,dst);
-						readUByteNorm(src,dst); //w
+						convertUByteXYZ(src,dst);
+						convertUByteNorm(src,dst); //w
 						break;
 					case(FVT_SHORT4_FLOAT4A):
-						readShortNorm(src,dst);
-						readShortNorm(src,dst);
-						readShortNorm(src,dst);
-						readShortNorm(src,dst);
+						convertShortNorm(src,dst);
+						convertShortNorm(src,dst);
+						convertShortNorm(src,dst);
+						convertShortNorm(src,dst);
 						break;
 					default:
 						throw std::runtime_error("Uknown tangent type!\n");
@@ -586,8 +584,8 @@ namespace cfr
 					case(FVT_BYTE4B):
 					case(FVT_BYTE4C):
 					case(FVT_BYTE4E):
-						readUByteXYZ(src,dst);
-						readUByteNorm(src,dst);
+						convertUByteXYZ(src,dst);
+						convertUByteNorm(src,dst);
 						break;
 					default:
 						throw std::runtime_error("Unknown bitangent type!\n");
@@ -603,10 +601,10 @@ namespace cfr
 					case(FVT_BYTE4A):
 					case(FVT_BYTE4C):
 						uread(&c,4,1,src);
-						f4[0] = (float)c[0]/255.0f;
-						f4[1] = (float)c[1]/255.0f;
-						f4[2] = (float)c[2]/255.0f;
-						f4[3] = (float)c[3]/255.0f;
+						f4[0] = (float)c[0];
+						f4[1] = (float)c[1];
+						f4[2] = (float)c[2];
+						f4[3] = (float)c[3];
 						uwrite((char*)&f4,16,1,dst);
 						break;
 					default:
@@ -620,7 +618,7 @@ namespace cfr
 	//for now only "all" is supported
 	void FLVER2::getVertexData(int meshIndex, int* uvCountOut, int* colorCountOut, int* tanCountOut)
 	{
-		std::vector<std::tuple<VertexSemantic,int>> requests;
+		/*std::vector<std::tuple<VertexSemantic,int>> requests;
 		
 		//printf("Meshindex: %i\n",meshIndex);
 
@@ -726,13 +724,6 @@ namespace cfr
 
 		//uvs_size += 1;
 
-		/*printf("c vert count: %i\n",vertCount);
-		printf("c pos size: %i\n",pos_size);
-		printf("c color count: %i\n",colorCount);
-		printf("c color size: %i\n",clr_size);
-		printf("c uv count: %i\n",uvCount);
-		printf("c uv size: %i\n",uvs_size);*/
-
 		vd->positions    = (float*)malloc(pos_size);
 		vd->bone_weights = (float*)malloc(bnw_size);
 		vd->bone_indices = (short*)malloc(bni_size);
@@ -797,28 +788,28 @@ namespace cfr
 						switch(vs)
 						{
 							case(FVS_POSITION):
-								readVertexData(vt,vs,src,dstPositions,NULL,uvFactor);
+								convertVertexType(vt,vs,src,dstPositions,NULL,uvFactor);
 								break;
 							case(FVS_BONE_WEIGHTS):
-								readVertexData(vt,vs,src,dstBoneWeights,NULL,uvFactor);
+								convertVertexType(vt,vs,src,dstBoneWeights,NULL,uvFactor);
 								break;
 							case(FVS_BONE_INDICES):
-								readVertexData(vt,vs,src,dstBoneIndices,NULL,uvFactor);
+								convertVertexType(vt,vs,src,dstBoneIndices,NULL,uvFactor);
 								break;
 							case(FVS_NORMAL):
-								readVertexData(vt,vs,src,dstNormals,dstNormalWs,uvFactor);
+								convertVertexType(vt,vs,src,dstNormals,dstNormalWs,uvFactor);
 								break;
 							case(FVS_TANGENT):
-								readVertexData(vt,vs,src,dstTangents,NULL,uvFactor);
+								convertVertexType(vt,vs,src,dstTangents,NULL,uvFactor);
 								break;
 							case(FVS_BITANGENT):
-								readVertexData(vt,vs,src,dstBitangents,NULL,uvFactor);
+								convertVertexType(vt,vs,src,dstBitangents,NULL,uvFactor);
 								break;
 							case(FVS_UV):
-								readVertexData(vt,vs,src,dstUVs,NULL,uvFactor);
+								convertVertexType(vt,vs,src,dstUVs,NULL,uvFactor);
 								break;
 							case(FVS_VERTEX_COLOR):
-								readVertexData(vt,vs,src,dstColors,NULL,uvFactor);
+								convertVertexType(vt,vs,src,dstColors,NULL,uvFactor);
 								break;
 							default:
 								printf("Unknown semantic: %i\n",vs);
@@ -892,31 +883,204 @@ namespace cfr
 		uclose(dstBitangents);
 		uclose(dstColors);
 
-		this->meshes[meshIndex]->vertexData = vd;
-	};
-
-	void FLVER2::generateFacesetNormArray(int meshIndex)
-	{
-		/*cfr::FLVER2::Faceset* facesetp = nullptr;
-		cfr::FLVER2::Mesh* meshp = this->meshes[meshIndex];
-		
-		uint64_t lowest_flags = LLONG_MAX;
-		
-		for(int mfsi = 0; mfsi < meshp->header.facesetCount; mfsi++)
-		{
-			int fsindex = meshp->facesetIndices[mfsi];
-			if(this->facesets[fsindex]->header.flags < lowest_flags)
-			{
-				facesetp = this->facesets[fsindex];
-				lowest_flags = facesetp->header.flags;
-			}
-		}
-
-		facesetp->*/
+		this->meshes[meshIndex]->vertexData = vd;*/
 	};
 
 	void FLVER2::getVertexDataOrdered(int meshIndex, int uvCount, int colorCount, int tanCount, int vertCount)
 	{
-		
+		//this->meshes[meshIndex].vertexData;
+
+		/*vertCount = 0;
+
+		for(int mvbi = 0; mvbi < this->meshes[meshIndex].header.vertexBufferCount; mvbi++)
+		{
+			int vbi = this->meshes[meshIndex].vertexBufferIndices[mvbi];
+
+			vertCount += this->vertexBuffers[vbi].header.vertexCount;
+		}
+
+		uint64_t lowest_flags = LLONG_MAX;
+		int fsi = 0;
+
+		for(int mfsi = 0; mfsi < this->meshes[meshIndex].header.facesetCount; mfsi++)
+		{
+			int fsindex = this->meshes[meshIndex].facesetIndices[mfsi];
+			if(this->facesets[fsindex].header.flags < lowest_flags)
+			{
+				fsi = fsindex;
+				lowest_flags = this->facesets[fsi].header.flags;
+			}
+		}
+
+		int triCount = this->facesets[fsi].triCount;
+		//printf("internal tri count: %i\n",triCount);
+
+		int opos_size = triCount * 3 * sizeof(float);
+		int obnw_size = triCount * 4 * sizeof(float);
+		int obni_size = triCount * 4 * sizeof(short);
+		int onrm_size = triCount * 3 * sizeof(float);
+		int onrw_size = triCount * 1 * sizeof(  int);
+		int otan_size = triCount * 4 * sizeof(float) * tanCount;
+		int obtn_size = triCount * 4 * sizeof(float);
+		int ouvs_size = triCount * 2 * sizeof(float) * uvCount;
+		int oclr_size = triCount * 4 * sizeof(float) * colorCount;
+
+		//printf("opos size %i\n",opos_size);
+
+		//ordered vertex data
+		cfr::VertexData* ovd = (cfr::VertexData*)malloc(sizeof(cfr::VertexData));
+		ovd->positions    = (char*)malloc(opos_size);
+		ovd->bone_weights = (char*)malloc(obnw_size);
+		ovd->bone_indices = (char*)malloc(obni_size);
+		ovd->normals      = (char*)malloc(onrm_size);
+		ovd->normalws     = (char*)malloc(onrw_size);
+		ovd->tangents     = (char*)malloc(otan_size);
+		ovd->bitangents   = (char*)malloc(obtn_size);
+		ovd->uvs          = (char*)malloc(ouvs_size);
+		ovd->colors       = (char*)malloc(oclr_size);
+
+		UMEM* dstPositions   = uopenMem(&ovd->positions[0],    opos_size);
+		UMEM* dstBoneWeights = uopenMem(&ovd->bone_weights[0], obnw_size);
+		UMEM* dstBoneIndices = uopenMem(&ovd->bone_indices[0], obni_size);
+		UMEM* dstNormals     = uopenMem(&ovd->normals[0],      onrm_size);
+		UMEM* dstNormalWs    = uopenMem(&ovd->normalws[0],     onrw_size);
+		UMEM* dstTangents    = uopenMem(&ovd->tangents[0],     otan_size);
+		UMEM* dstBitangents  = uopenMem(&ovd->bitangents[0],   obtn_size);
+		UMEM* dstUVs         = uopenMem(&ovd->uvs[0],          ouvs_size);
+		UMEM* dstColors      = uopenMem(&ovd->colors[0],       oclr_size);
+
+		int pos_size = vertCount * 3 * sizeof(float);
+		int bnw_size = vertCount * 4 * sizeof(float);
+		int bni_size = vertCount * 4 * sizeof(short);
+		int nrm_size = vertCount * 3 * sizeof(float);
+		int nrw_size = vertCount * 1 * sizeof(  int);
+		int tan_size = vertCount * 4 * sizeof(float) * tanCount;
+		int btn_size = vertCount * 4 * sizeof(float);
+		int uvs_size = vertCount * 2 * sizeof(float) * uvCount;
+		int clr_size = vertCount * 4 * sizeof(float) * colorCount;
+
+		//printf("pos size %i\n",pos_size);
+
+		//open up umem handles on the data outputs
+		UMEM* srcPositions   = uopenMem(&this->meshes[meshIndex].vertexData->positions[0],    pos_size);
+		UMEM* srcBoneWeights = uopenMem(&this->meshes[meshIndex].vertexData->bone_weights[0], bnw_size);
+		UMEM* srcBoneIndices = uopenMem(&this->meshes[meshIndex].vertexData->bone_indices[0], bni_size);
+		UMEM* srcNormals     = uopenMem(&this->meshes[meshIndex].vertexData->normals[0],      nrm_size);
+		UMEM* srcNormalWs    = uopenMem(&this->meshes[meshIndex].vertexData->normalws[0],     nrw_size);
+		UMEM* srcTangents    = uopenMem(&this->meshes[meshIndex].vertexData->tangents[0],     tan_size);
+		UMEM* srcBitangents  = uopenMem(&this->meshes[meshIndex].vertexData->bitangents[0],   btn_size);
+		UMEM* srcUVs         = uopenMem(&this->meshes[meshIndex].vertexData->uvs[0],          uvs_size);
+		UMEM* srcColors      = uopenMem(&this->meshes[meshIndex].vertexData->colors[0],       clr_size);
+
+		//printf("srcpos pos %i\n",srcPositions->mem->position);
+
+		//printf("vertcountinternal: %i\n",vertCount);
+
+		//an absolutely massive buffer
+		float b[32]; //128 bytes should be enough?
+		//TODO: malloc this with highest sized element
+
+		//rewrite the vertex data to be in the same order as faceset wants
+		for(int ti = 0; ti < triCount; ti++)
+		{
+			useek(srcPositions,12*this->facesets[fsi].triList[ti],SEEK_SET);
+			uread(&b[0],12,1,srcPositions);
+			uwrite((char*)&b[0],12,1,dstPositions);
+
+			useek(srcBoneWeights,16*this->facesets[fsi].triList[ti],SEEK_SET);
+			uread(&b[0],16,1,srcBoneWeights);
+			uwrite((char*)&b[0],16,1,dstBoneWeights);
+
+			useek(srcBoneIndices,8*this->facesets[fsi].triList[ti],SEEK_SET);
+			uread(&b[0],8,1,srcBoneIndices);
+			uwrite((char*)&b[0],8,1,dstBoneIndices);
+
+			useek(srcNormals,12*this->facesets[fsi].triList[ti],SEEK_SET);
+			uread(&b[0],12,1,srcNormals);
+			uwrite((char*)&b[0],12,1,dstNormals);
+
+			useek(srcNormalWs,4*this->facesets[fsi].triList[ti],SEEK_SET);
+			uread(&b[0],4,1,srcNormalWs);
+			uwrite((char*)&b[0],4,1,dstNormalWs);
+
+			if(tanCount > 0)
+			{
+				useek(srcTangents,16*this->facesets[fsi].triList[ti]*tanCount,SEEK_SET);
+				uread(&b[0],16,tanCount,srcTangents);
+				uwrite((char*)&b[0],16,tanCount,dstTangents);
+			}
+
+			useek(srcBitangents,16*this->facesets[fsi].triList[ti],SEEK_SET);
+			uread(&b[0],16,1,srcBitangents);
+			uwrite((char*)&b[0],16,1,dstBitangents);
+
+			if(uvCount > 0)
+			{
+				useek(srcUVs,8*this->facesets[fsi].triList[ti]*uvCount,SEEK_SET);
+				uread(&b[0],8,uvCount,srcUVs);
+				uwrite((char*)&b[0],8,uvCount,dstUVs);
+			}
+
+			if(colorCount > 0)
+			{
+				useek(srcColors,16*this->facesets[fsi].triList[ti]*colorCount,SEEK_SET);
+				uread(&b[0],16,colorCount,srcColors);
+				uwrite((char*)&b[0],16,colorCount,dstColors);
+			}
+		}
+
+		uclose(srcPositions);
+		uclose(srcBoneWeights);
+		uclose(srcBoneIndices);
+		uclose(srcNormals);
+		uclose(srcNormalWs);
+		uclose(srcUVs);
+		uclose(srcTangents);
+		uclose(srcBitangents);
+		uclose(srcColors);
+
+		this->meshes[meshIndex].vertexDataOrdered = ovd;
+	};
+
+	void vertMap(float* array, int size, int count, int* faceset, int triCount)
+	{
+		std::map<int,std::tuple<float,float,float>> vertMap;
+
+		for(int tri = 0; tri < triCount; tri++)
+		{
+			std::vector<std::tuple<float,float,float>> verts;
+
+			for(int i = 0; i < 3; i++)
+			{
+				int indexKey = faceset[tri+i];
+				printf("indexKey:%i\n",indexKey);
+				std::tuple<float,float,float> vert;
+
+				if(vertMap.count(indexKey) == 0)
+				{
+					float f1 = array[indexKey*3+0];
+					printf("f1:%f\n",f1);
+					float f2 = array[indexKey*3+1];
+					float f3 = array[indexKey*3+2];
+					vert = std::make_tuple(f1,f2,f3);
+
+					vertMap[indexKey] = vert;
+				}
+				else
+				{
+					printf("uhh\n");
+					vert = vertMap.at(indexKey);
+				}
+
+				verts.push_back(vert);
+			}
+
+			for(int i = 0; i < verts.size(); i++)
+			{
+				printf("1: %8.2f\t",std::get<0>(verts[i]));
+				printf("2: %8.2f\t",std::get<1>(verts[i]));
+				printf("3: %8.2f\n",std::get<2>(verts[i]));
+			}
+		}*/
 	};
 };

@@ -13,15 +13,20 @@
 namespace cfr {
 	struct VertexData 
 	{
-		float* positions    ;
-		float* bone_weights ;
-		short* bone_indices ;
-		float* normals      ;
-		int*   normalws     ;
-		float* uvs          ;
-		float* tangents     ;
-		float* bitangents   ;
-		float* colors       ;
+		float* positions;
+		float* bone_weights;
+		short* bone_indices;
+		float* normals;
+		int*   normalws;
+		float* uvs;
+		float* tangents;
+		float* bitangents;
+		float* colors;
+
+		int vertexCount;
+		int normalCount;
+		int uvCount;
+		int colorCount;
 	};
 
 	enum VertexSemantic
@@ -91,7 +96,7 @@ namespace cfr {
 		FVT_EDGE				= 0xF0, //unknown
 	};
 		
-	class FLVER2 : public File
+	class FLVER2
 	{
 		public:
 		//forward declare everything
@@ -200,6 +205,7 @@ namespace cfr {
 			char* data;
 
 			GxItem(UMEM* src, FLVER2* parent);
+			~GxItem();
 		};
 
 		class Material //unclear on how safe this is '_>', specifically gxOffset
@@ -232,6 +238,7 @@ namespace cfr {
 			GxItem* gxItems;
 			int gxItemCount;
 			Material(UMEM* src, FLVER2* parent);
+			~Material();
 			void print();
 		};
 
@@ -264,6 +271,7 @@ namespace cfr {
 			//char emptyJunk[52]; //potentially needed for spacing :/
 
 			Bone(UMEM* src, FLVER2* parent);
+			~Bone();
 			
 			void print();
 		};
@@ -294,7 +302,7 @@ namespace cfr {
 				uint32_t facesetIndicesOffset;
 
 				int32_t vertexBufferCount;
-				uint32_t vertexBufferIndicesOffset; //loc of the vertbuffind array
+				uint32_t vertexBufferIndicesOffset; //loc of the VertBuffIndex array
 			};
 			
 			Mesh::Header header;
@@ -308,20 +316,19 @@ namespace cfr {
 
 			int32_t* boneIndices; //size of boneCount
 			int32_t* facesetIndices; //size of faceSetCount
-			Faceset* facesets; //pointers to the actual facesets
+			Faceset* facesets; //pointers to the actual facesets IS THIS IN USE? IF NOT, REMOVE!
 			int32_t* vertexBufferIndices; //size of vertexBufferCount
 			FLVER2* parent;
 			VertexData* vertexData = nullptr;
-			VertexData* vertexDataOrdered = nullptr;
 
 			Mesh(UMEM* src, FLVER2* parent);
+			~Mesh();
 
 			//ret binary vert data in specd format vec of ints to select type and order
 			char* writeVertexData();
 
 			//std::vector<float> getVertPositions();
 			std::vector<float> getNormals();
-			
 		};
 
 		struct Member
@@ -359,9 +366,10 @@ namespace cfr {
 			};
 
 			Header header;
-			UMEM* data; //size of dataLength
+			char* data; //size of dataLength
 
 			Member(UMEM* src, long startOffset);
+			~Member();
 		};
 
 		class EdgeIndices
@@ -377,9 +385,10 @@ namespace cfr {
 			};
 
 			Header header;
-			std::vector<Member*> members; //size of memberCount
+			Member* members; //size of memberCount
 
 			EdgeIndices(UMEM* src);
+			~EdgeIndices();
 		};
 
 		class Faceset
@@ -414,8 +423,10 @@ namespace cfr {
 			int* triList = nullptr;
 			long triCount = 0;
 			int vertexSize = 0; //more accurate
+			float* facesetNorms = nullptr; //just... for later
 
 			Faceset(UMEM* src, FLVER2* parent);
+			~Faceset();
 
 			//will add to module to avoid copying data
 			//std::vector<int> getTriStrip();
@@ -433,6 +444,7 @@ namespace cfr {
 			int32_t index = 0; //this doesn't seem to be used?
 
 			LayoutMember(UMEM* src);
+			~LayoutMember();
 		};
 
 		class BufferLayout
@@ -453,6 +465,7 @@ namespace cfr {
 			LayoutMember* members = nullptr;
 
 			BufferLayout(UMEM* src);
+			~BufferLayout();
 
 			//prints human readable laytout info
 			void print();
@@ -472,14 +485,15 @@ namespace cfr {
 				int32_t unk14 = 0; //assert(0)
 
 				uint32_t verticesLength = 0; //0 in version 20005, non 0 in 20008
-				int32_t bufferOffset   = 0; //location in flver file
+				int32_t  bufferOffset   = 0; //location in flver file
 			};
 			
 			VertexBuffer::Header header;
-			char* verts = nullptr; //actual data that data hooks to
+			char* verts = nullptr; //actual byte data that data hooks to
 			UMEM* data = nullptr; //vertexCount * vertexSize
 
 			VertexBuffer(UMEM* src, FLVER2* parent);
+			~VertexBuffer();
 		};
 
 		class Texture
@@ -505,6 +519,7 @@ namespace cfr {
 			int typeLength;
 
 			Texture(UMEM* src, FLVER2* parent);
+			~Texture();
 
 			void print();
 		};
@@ -533,22 +548,36 @@ namespace cfr {
 		};
 
 		Header header;
-		Dummy* dummies;
-		Material* materials;
-		Bone* bones;
-		Mesh* meshes;
-		Faceset* facesets;
-		VertexBuffer* vertexBuffers;
-		BufferLayout* bufferLayouts;
-		Texture* textures;
+		Dummy** dummies;
+		Material** materials;
+		Bone** bones;
+		Mesh** meshes;
+		Faceset** facesets;
+		VertexBuffer** vertexBuffers;
+		BufferLayout** bufferLayouts;
+		Texture** textures;
 
 		FLVER2(const char* path);
 		FLVER2(UMEM* src);
+		FLVER2(); //for generating new ones
+		~FLVER2();
+
+		void addDummy(Dummy* d);
+		void addMaterial(Material* m);
+		void addBone(Bone* b);
+		void addMesh(Mesh* m);
+		void addFaceset(Faceset* f);
+		void addVertexBuffer(VertexBuffer* b);
+		void addBufferLayout(BufferLayout* b);
+		void addTexture(Texture* t);
+		
+		void write(const char* path);
 
 		//returns buffer layout for specific mesh
 		std::vector<FLVER2::BufferLayout> getMeshBufferLayouts(int meshIndex);
 		void getVertexData(int meshIndex, int* uvCount, int* colorCount, int* tanCount);
 		void getVertexDataOrdered(int meshIndex, int uvCount, int colorCount, int tanCount, int vertCount);
+		void generateFacesetNormArray(int meshIndex);
 	};
 
 	// :(

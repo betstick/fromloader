@@ -12,12 +12,11 @@
 #include <unordered_map>
 #include <wchar.h>
 #include <stdbool.h>
+#include <algorithm>
 
 //string conversions
 #include <locale>
 #include <codecvt>
-#include <unicode/unistr.h>
-#include <unicode/icuplug.h>
 
 //memory manipulation
 #include <memory>

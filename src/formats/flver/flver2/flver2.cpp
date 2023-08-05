@@ -1,5 +1,5 @@
 #include "flver2.h"
-
+#define VALIDATE_ALL 
 //this method isn't that friendly to performance, but its reasonably clean.
 
 namespace cfr
@@ -12,7 +12,10 @@ namespace cfr
 
 #ifdef VALIDATE_ALL
 		if(strncmp(this->magic,"FLVER\0",6) != 0)
+		{
+			printf("Failed to validate FLVER2!\n");
 			throw std::runtime_error("Failed to validate FLVER2!\n");
+		}
 #endif
 	};
 
@@ -29,23 +32,34 @@ namespace cfr
 	FLVER2::Material::Material(UMEM* src, FLVER2* parent)
 	{
 		uread(&this->header,sizeof(Header),1,src);
-		this->gxItems = (GxItem*)malloc(sizeof(GxItem));
 
-		this->name = getUniversalString(this->header.nameOffset,parent->header.unicode,src,&this->nameLength);
+		uint32_t nameOffset = this->header.nameOffset;
+		
+		int8_t unicode = parent->header.unicode;
+		//printf("unicode: %i\n",unicode);
+		this->name = getUniversalString(nameOffset,unicode,src,&this->nameLength);
+		//printf("%ls\n",this->name);
+		uint32_t mtdOffset = this->header.mtdOffset;
+		this->mtdName = getUniversalString(mtdOffset,unicode,src,&this->mtdNameLength);
 
-		this->mtdName = getUniversalString(this->header.mtdOffset,parent->header.unicode,src,&this->mtdNameLength);
+		//printf("this->mtdnamelength: %i\n",this->mtdNameLength);
 
-		if(this->header.gxOffset == 0)
-			gxIndex = -1;
+		//idk even know what gxitems *are*
 
-		if(this->header.gxOffset != 0)
+		//this->gxItems = (GxItem*)malloc(sizeof(GxItem));
+
+		/*if(this->header.gxOffset == 0)
+			gxIndex = -1;*/
+
+		/*if(this->header.gxOffset != 0)
 		{
 			int gxCount = 0;
 			long startpos = utell(src); //come back after enumeration
 			useek(src,this->header.gxOffset,SEEK_CUR);
 			
 			//dry run to get count
-			if(parent->header.version <= 0x20010)
+			//if(parent->header.version <= 0x20010)
+			if(parent->header.version <= 0x01002)
 			{
 				//read one 
 				int gxCount = 1;
@@ -53,15 +67,21 @@ namespace cfr
 			else
 			{
 				//read until terminator value found
-				int value = 0;
 				while(true)
 				{
-					uread(&value,sizeof(int32_t),1,src);
-					if(value != INT_MAX && value != -1)
+					GxItem* temp = new GxItem(src,parent);
+					gxCount++;
+					//uread(&value,sizeof(int32_t),1,src);
+					//if(value != INT_MAX && value != -1)
+					if(
+						temp->id != 0x7FFFFFFF && 
+						temp->id != 0xFFFFFFF7 //&& 
+						//parent->header.version >= 0x20010
+					)
 					{
 						//read it off into the void
-						GxItem(src,parent);
-						gxCount++;
+						//GxItem(src,parent);
+						//gxCount++;
 					}
 					else
 					{
@@ -71,6 +91,7 @@ namespace cfr
 			}
 
 			this->gxItemCount = gxCount;
+			printf("gxcount: %i\n",this->gxItemCount);
 			this->gxItems = (GxItem*)malloc(sizeof(GxItem) * gxCount);
 
 			useek(src,this->header.gxOffset,SEEK_CUR);
@@ -88,7 +109,15 @@ namespace cfr
 			//assert all chars in terminator are 0x00
 			
 			useek(src,startpos,SEEK_SET);
-		}
+		}*/
+	};
+
+	FLVER2::Material::~Material()
+	{
+		free(this->name);
+		this->name = NULL;
+		free(this->mtdName);
+		this->mtdName = NULL;
 	};
 
 	FLVER2::GxItem::GxItem(UMEM* src, FLVER2* parent)
@@ -100,7 +129,19 @@ namespace cfr
 		uread(&this->length,sizeof(int32_t),1,src);
 
 		if(this->length > 12)
+		{
+			this->data = (char*)malloc(this->length-12);
 			uread(&this->data[0],this->length-12,1,src);
+		}
+	};
+
+	FLVER2::GxItem::~GxItem()
+	{
+		if(this->length > 12)
+		{
+			free(this->data);
+			this->data = NULL;
+		}
 	};
 
 	FLVER2::Bone::Bone(UMEM* src, FLVER2* parent)
@@ -133,17 +174,23 @@ namespace cfr
 		useek(src,52,SEEK_CUR); //skip empty junk padding
 	};
 
+	FLVER2::Bone::~Bone()
+	{
+		free(this->name);
+		this->name = NULL;
+	};
+
 	FLVER2::Mesh::Mesh(UMEM* src, FLVER2* parent)
 	{
 		uread(&this->header,sizeof(Header),1,src);
 
 #ifdef VALIDATE_ALL
-		assertMsg(this->Header.unk01,"FLVER2::Mesh.Header.unk01 is not 0!\n");
-		assertMsg(this->Header.unk02,"FLVER2::Mesh.Header.unk02 is not 0!\n");
-		assertMsg(this->Header.unk03,"FLVER2::Mesh.Header.unk03 is not 0!\n");
+		assertMsg(this->header.unk01,"FLVER2::Mesh.Header.unk01 is not 0!\n");
+		assertMsg(this->header.unk02,"FLVER2::Mesh.Header.unk02 is not 0!\n");
+		assertMsg(this->header.unk03,"FLVER2::Mesh.Header.unk03 is not 0!\n");
 
-		assertMsg(this->Header.unk08,"FLVER2::Mesh.Header.unk08 is not 0!\n");
-		assertMsg(this->Header.unk0C,"FLVER2::Mesh.Header.unk0C is not 0!\n");
+		assertMsg(this->header.unk08,"FLVER2::Mesh.Header.unk08 is not 0!\n");
+		assertMsg(this->header.unk0C,"FLVER2::Mesh.Header.unk0C is not 0!\n");
 #endif
 
 		long pos = utell(src);
@@ -177,31 +224,51 @@ namespace cfr
 		useek(src,pos,SEEK_SET);
 	};
 
+	FLVER2::Mesh::~Mesh()
+	{
+		if(this->header.boneCount > 0)
+		{
+			free(this->boneIndices);
+			this->boneIndices = NULL;
+		}
+
+		free(this->facesetIndices);
+		this->facesetIndices = NULL;
+
+		free(this->vertexBufferIndices);
+		this->vertexBufferIndices = NULL;
+	};
+
 	FLVER2::Member::Member(UMEM* src, long startOffset)
 	{
 		uread(&this->header,sizeof(Header),1,src);
 
 #ifdef VALIDATE_ALL
-		assertMsg(this->Header.unk08,"FLVER2::Member.Header.unk08 is not 0!\n");
-		assertMsg(this->Header.unk0C,"FLVER2::Member.Header.unk0C is not 0!\n");
+		assertMsg(this->header.unk08,"FLVER2::Member.Header.unk08 is not 0!\n");
+		assertMsg(this->header.unk0C,"FLVER2::Member.Header.unk0C is not 0!\n");
 
-		assertMsg(this->Header.unk20,"FLVER2::Member.Header.unk20 is not 0!\n");
-		assertMsg(this->Header.unk24,"FLVER2::Member.Header.unk24 is not 0!\n");
-		assertMsg(this->Header.unk28,"FLVER2::Member.Header.unk28 is not 0!\n");
-		assertMsg(this->Header.unk2C,"FLVER2::Member.Header.unk2C is not 0!\n");
+		assertMsg(this->header.unk20,"FLVER2::Member.Header.unk20 is not 0!\n");
+		assertMsg(this->header.unk24,"FLVER2::Member.Header.unk24 is not 0!\n");
+		assertMsg(this->header.unk28,"FLVER2::Member.Header.unk28 is not 0!\n");
+		assertMsg(this->header.unk2C,"FLVER2::Member.Header.unk2C is not 0!\n");
 
-		assertMsg(this->Header.unk3C == -1,"FLVER2::Member.Header.unk3C is not -1!\n");
+		assertMsg(this->header.unk3C == -1,"FLVER2::Member.Header.unk3C is not -1!\n");
 #endif
 
 		long pos = utell(src);
 
 		useek(src,startOffset+this->header.dataOffset,SEEK_SET);
 
-		char* tmp = (char*)malloc(sizeof(this->header.dataLength));
-		uread(tmp,this->header.dataLength,1,src);
-		this->data = uopenMem(tmp,this->header.dataLength);
+		this->data = (char*)malloc(this->header.dataLength);
+		uread(this->data,this->header.dataLength,1,src);
 
 		useek(src,pos,SEEK_SET);
+	};
+
+	FLVER2::Member::~Member()
+	{
+		free(this->data);
+		this->data = NULL;
 	};
 
 	FLVER2::EdgeIndices::EdgeIndices(UMEM* src)
@@ -211,13 +278,23 @@ namespace cfr
 		uread(&this->header,sizeof(Header),1,src);
 
 #ifdef VALIDATE_ALL
-		assertMsg(this->Header.unk08,"FLVER2::EdgeIndices.Header.unk08 is not 0!\n");
+		assertMsg(this->header.unk08,"FLVER2::EdgeIndices.Header.unk08 is not 0!\n");
 #endif
+		
+		this->members = (Member*)malloc(sizeof(Member) * this->header.memberCount);
+		for(int i = 0; i < this->header.memberCount; i++)
+			this->members[i] = Member(src,pos);
+	};
 
-		for(int i = this->header.memberCount; i > 0; i--)
+	FLVER2::EdgeIndices::~EdgeIndices()
+	{
+		for(int i = 0; i < this->header.memberCount; i++)
 		{
-			this->members.push_back(new Member(src,pos));
+			this->members[i].~Member();
 		}
+
+		free(this->members);
+		this->members = NULL;
 	};
 
 	FLVER2::Faceset::Faceset(UMEM* src, FLVER2* parent)
@@ -232,11 +309,6 @@ namespace cfr
 			this->vertInfo.vertexIndexSize = parent->header.vertexIndexSize;
 		
 		this->vertexSize = this->vertInfo.vertexIndexSize;
-
-		/*if(parent->header.vertexIndexSize == 0)
-			this->vertexSize = this->vertInfo.vertexIndexSize;
-		else
-			this->vertexSize = parent->header.vertexIndexSize;*/
 		
 		long pos = utell(src);
 		useek(src,parent->header.dataOffset + this->header.vertexIndicesOffset,SEEK_SET);
@@ -261,32 +333,45 @@ namespace cfr
 		useek(src,pos,SEEK_SET);
 	};
 
+	FLVER2::Faceset::~Faceset()
+	{
+		if(this->vertInfo.vertexIndexSize == 16)
+		{
+			free(this->vertexIndicesShort);
+			this->vertexIndicesShort = NULL;
+		}
+		else if(this->vertexSize == 32)
+		{
+			free(this->vertexIndicesInt);
+			this->vertexIndicesInt = NULL;
+		}
+	};
+
 	FLVER2::VertexBuffer::VertexBuffer(UMEM* src, FLVER2* parent)
 	{
 		uread(&this->header,sizeof(VertexBuffer::Header),1,src);
 		long dataSize = this->header.vertexCount*this->header.vertexSize;
 
 #ifdef VALIDATE_ALL
-		assertMsg(this->Header.unk10,"FLVER2::EdgeIndices.Header.unk10 is not 0!\n");
-		assertMsg(this->Header.unk14,"FLVER2::EdgeIndices.Header.unk14 is not 0!\n");
+		assertMsg(this->header.unk10,"FLVER2::EdgeIndices.Header.unk10 is not 0!\n");
+		assertMsg(this->header.unk14,"FLVER2::EdgeIndices.Header.unk14 is not 0!\n");
 #endif
 
-		if(this->header.unk10 == 0 && this->header.unk14 == 0)
-		{
-			long pos = utell(src);
+		long pos = utell(src);
 
-			this->verts = (char*)malloc(dataSize);
-			useek(src,this->header.bufferOffset + parent->header.dataOffset,SEEK_SET);
-			uread(this->verts,dataSize,1,src);
-			this->data = uopenMem(this->verts,dataSize);
+		this->verts = (char*)malloc(dataSize);
+		useek(src,this->header.bufferOffset + parent->header.dataOffset,SEEK_SET);
+		uread(this->verts,dataSize,1,src);
+		this->data = uopenMem(this->verts,dataSize);
 
-			useek(src,pos,SEEK_SET);
-		}
-		else
-		{
-			printf("Failed to verify unk data!\n");
-			throw std::runtime_error("Failed to verify unk data!\n");
-		}
+		useek(src,pos,SEEK_SET);
+	};
+
+	FLVER2::VertexBuffer::~VertexBuffer()
+	{
+		uclose(this->data); //TODO: remove this stupid nonsense!
+		free(this->verts);
+		this->verts = NULL;
 	};
 
 	FLVER2::LayoutMember::LayoutMember(UMEM* src)
@@ -296,6 +381,11 @@ namespace cfr
 #ifdef VALIDATE_ALL
 		//assertMsg(this->header.unk04,"FLVER2::LayoutMember.unk00 not from 0 to 2!\n");
 #endif
+	};
+
+	FLVER2::LayoutMember::~LayoutMember()
+	{
+
 	};
 
 	FLVER2::BufferLayout::BufferLayout(UMEM* src)
@@ -313,11 +403,19 @@ namespace cfr
 		this->members = (FLVER2::LayoutMember*)malloc(sizeof(FLVER2::LayoutMember) * this->header.memberCount);
 
 		for(int i = 0; i < this->header.memberCount; i++)
-		{
 			this->members[i] = LayoutMember(src);
-		}
 
 		useek(src,pos,SEEK_SET);
+	};
+
+	FLVER2::BufferLayout::~BufferLayout()
+	{
+		for(int i = 0; i < this->header.memberCount; i++)
+		{
+			this->members[i].~LayoutMember();
+		}
+		free(this->members);
+		this->members = NULL;
 	};
 
 	FLVER2::Texture::Texture(UMEM* src, FLVER2* parent)
@@ -342,6 +440,15 @@ namespace cfr
 #endif
 	};
 
+	FLVER2::Texture::~Texture()
+	{
+		free(this->path);
+		this->path = NULL;
+
+		free(this->type);
+		this->type = NULL;
+	};
+
 	//TODO: VALIDATE THESE
 	FLVER2::VertexBoneWeights::VertexBoneWeights(UMEM* src)
 	{
@@ -361,9 +468,10 @@ namespace cfr
 #endif
 	};
 
+	//early declare to be called by specific initializers
 	void initFLVER2(FLVER2* f, UMEM* src);
 
-	FLVER2::FLVER2(const char* path) : File(path)
+	FLVER2::FLVER2(const char* path)
 	{
 		UMEM* src;
 		if (src = uopenFile(path,"rb"))
@@ -372,76 +480,157 @@ namespace cfr
 		}
 		else
 		{
-			throw std::runtime_error("Failed to open file!");
+			printf("Failed to open file!\n");
+			throw std::runtime_error("Failed to open file!\n");
 		}
 	};
 
-	FLVER2::FLVER2(UMEM* src) : File(src)
+	FLVER2::FLVER2(UMEM* src)
 	{
 		useek(src,0,SEEK_SET);
 		initFLVER2(this,src);
 	};
 
+	//for generating new flvers
+	FLVER2::FLVER2()
+	{
+
+	};
+
+	FLVER2::~FLVER2()
+	{
+		for(int i = 0; i < this->header.dummyCount; i++)
+		{
+			delete(this->dummies[i]);
+			this->dummies[i] = NULL;
+		}
+
+		for(int i = 0; i < this->header.materialCount; i++)
+		{
+			delete(this->materials[i]);
+			this->materials[i] = NULL;
+		}
+
+		for(int i = 0; i < this->header.boneCount; i++)
+		{
+			delete(this->bones[i]);
+			this->bones[i] = NULL;
+		}
+
+		for(int i = 0; i < this->header.meshCount; i++)
+		{
+			delete(this->meshes[i]);
+			this->meshes[i] = NULL;
+		}
+
+		for(int i = 0; i < this->header.facesetCount; i++)
+		{
+			delete(this->facesets[i]);
+			this->facesets[i] = NULL;
+		}
+
+		for(int i = 0; i < this->header.vertexBufferCount; i++)
+		{
+			delete(this->vertexBuffers[i]);
+			this->vertexBuffers[i] = NULL;
+		}
+
+		for(int i = 0; i < this->header.bufferLayoutCount; i++)
+		{
+			delete(this->bufferLayouts[i]);
+			this->bufferLayouts[i] = NULL;
+		}
+
+		for(int i = 0; i < this->header.textureCount; i++)
+		{
+			delete(this->textures[i]);
+			this->textures[i] = NULL;
+		}
+
+		free(this->dummies);
+		this->dummies = NULL;
+
+		free(this->materials);
+		this->materials = NULL;
+
+		free(this->bones);
+		this->bones = NULL;
+
+		free(this->meshes);
+		this->meshes = NULL;
+
+		free(this->facesets);
+		this->facesets = NULL;
+
+		free(this->vertexBuffers);
+		this->vertexBuffers = NULL;
+
+		free(this->bufferLayouts);
+		this->bufferLayouts = NULL;
+
+		free(this->textures);
+		this->textures = NULL;
+	};
+
 	void initFLVER2(FLVER2* f, UMEM* src)
 	{
-		f->data = src;
-		f->header = FLVER2::Header(f->data);
+		UMEM* data = src;
+		f->header = FLVER2::Header(data);
 
-		//printf("bone count: %i\n",f->header.boneCount);
-		//printf("faceset count: %i\n",f->header.facesetCount);
+		//printf("[F] Bone count: %i\n",f->header.boneCount);
+		//printf("[F] Faceset count: %i\n",f->header.facesetCount);
 		//printf("mesh count: %i\n",f->header.meshCount);
 		//printf("vert buff count: %i\n",f->header.vertexBufferCount);
+		//printf("dummy count: %i\n",f->header.dummyCount);
 
-		f->dummies = (FLVER2::Dummy*)malloc(sizeof(FLVER2::Dummy) * f->header.dummyCount);
-		f->materials = (FLVER2::Material*)malloc(sizeof(FLVER2::Material) * f->header.materialCount);
-		f->bones = (FLVER2::Bone*)malloc(sizeof(FLVER2::Bone) * f->header.boneCount);
-		f->meshes = (FLVER2::Mesh*)malloc(sizeof(FLVER2::Mesh) * f->header.meshCount);
-		f->facesets = (FLVER2::Faceset*)malloc(sizeof(FLVER2::Faceset) * f->header.facesetCount);
-		f->vertexBuffers = (FLVER2::VertexBuffer*)malloc(sizeof(FLVER2::VertexBuffer) * f->header.vertexBufferCount);
-		f->bufferLayouts = (FLVER2::BufferLayout*)malloc(sizeof(FLVER2::BufferLayout) * f->header.bufferLayoutCount);
-		f->textures = (FLVER2::Texture*)malloc(sizeof(FLVER2::Texture) * f->header.textureCount);
+		f->dummies = (FLVER2::Dummy**)malloc(sizeof(FLVER2::Dummy) * f->header.dummyCount);
+		f->materials = (FLVER2::Material**)malloc(sizeof(FLVER2::Material) * f->header.materialCount);
+		f->bones = (FLVER2::Bone**)malloc(sizeof(FLVER2::Bone) * f->header.boneCount);
+		f->meshes = (FLVER2::Mesh**)malloc(sizeof(FLVER2::Mesh) * f->header.meshCount);
+		f->facesets = (FLVER2::Faceset**)malloc(sizeof(FLVER2::Faceset) * f->header.facesetCount);
+		f->vertexBuffers = (FLVER2::VertexBuffer**)malloc(sizeof(FLVER2::VertexBuffer) * f->header.vertexBufferCount);
+		f->bufferLayouts = (FLVER2::BufferLayout**)malloc(sizeof(FLVER2::BufferLayout) * f->header.bufferLayoutCount);
+		f->textures = (FLVER2::Texture**)malloc(sizeof(FLVER2::Texture) * f->header.textureCount);
 
 		for(int i = 0; i < f->header.dummyCount; i++)
-			f->dummies[i] = FLVER2::Dummy(f->data);
+			f->dummies[i] = new FLVER2::Dummy(data);
 		
-		//printf("dummy0: %f\n",f->dummies[0].position.x);
+		//printf("dummy0: %f\n",f->dummies[0]->position.x);
 
 		for(int i = 0; i < f->header.materialCount; i++)
-			f->materials[i] = FLVER2::Material(f->data,f);
+			f->materials[i] = new FLVER2::Material(data,f);
 
-		//printf("mat %i name: %LS\n",0,f->materials[0].name);
-		//f->materials[0].print();
+		//f->materials[0]->print();
 
 		for(int i = 0; i < f->header.boneCount; i++)
-			f->bones[i] = FLVER2::Bone(f->data,f);
+			f->bones[i] = new FLVER2::Bone(data,f);
 	
-		//f->bones[22].print();
+		//f->bones[22]->print();
 		
 		for(int i = 0; i < f->header.meshCount; i++)
-			f->meshes[i] = FLVER2::Mesh(f->data,f);
+			f->meshes[i] = new FLVER2::Mesh(data,f);
 
-		//printf("mesh0: %i\n",f->meshes[0].header.facesetCount);
+		//printf("mesh0 fc count: %i\n",f->meshes[0]->header.facesetCount);
 
 		for(int i = 0; i < f->header.facesetCount; i++)
-			f->facesets[i] = FLVER2::Faceset(f->data,f);
+			f->facesets[i] = new FLVER2::Faceset(data,f);
 
-		//printf("faceset0: %i\n",f->facesets[0].header.vertexIndexCount);
+		//printf("faceset0: %i\n",f->facesets[0]->header.vertexIndexCount);
 		
 		for(int i = 0; i < f->header.vertexBufferCount; i++)
-			f->vertexBuffers[i] = FLVER2::VertexBuffer(f->data,f);
+			f->vertexBuffers[i] = new FLVER2::VertexBuffer(data,f);
 
-		//printf("vertexbuffer0: %i\n",f->vertexBuffers[0].header.vertexCount);
+		//printf("vertexbuffer0: %i\n",f->vertexBuffers[0]->header.vertexCount);
 		
 		for(int i = 0; i < f->header.bufferLayoutCount; i++)
-			f->bufferLayouts[i] = FLVER2::BufferLayout(f->data);
+			f->bufferLayouts[i] = new FLVER2::BufferLayout(data);
 		
 		for(int i = 0; i < f->header.textureCount; i++)
-			f->textures[i] = FLVER2::Texture(f->data,f);
+			f->textures[i] = new FLVER2::Texture(data,f);
 
-		//f->textures[0].print();
-		//f->textures[1].print();
+		//f->textures[0]->print();
 
-		useek(f->data,0,SEEK_SET);
+		uclose(data);
 	};
 
 	void FLVER2::Bone::print()

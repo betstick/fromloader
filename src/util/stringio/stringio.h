@@ -29,9 +29,18 @@ namespace cfr
 	int getWideStringLength(wchar_t* str);
 
 	//seeks to string, reads till null, returns wchar array, sets len, returns to start
+	//DONT USE THIS, I'M REMOVING IT!!!!
 	wchar_t* getUniversalString(long offset, bool unicode, UMEM* src, int* len);
 
-	char* jisToUtf8(char* str, int lengthIn, std::map<int,int>* charMap, int* lengthOut);
+	std::string readUniStr(bool unicode, bool jis, UMEM* src, long offset = INT64_MIN);
+
+	int writeUniStr(bool unicode, bool jis, std::string str, UMEM* dst, long offset = INT64_MIN);
+
+	std::string jisToUtf8(std::string);
+
+	std::string utf8ToJIS(std::string str);
+
+	int jisToUtf8(char* str, int lengthIn, char* out);
 };
 
 #endif
